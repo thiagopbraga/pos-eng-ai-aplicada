@@ -66,6 +66,22 @@ const tensorLabels = [
     [0, 0, 1]  // basic - Carlos
 ];
 
+// Gera um one-hot aleatório de tamanho `size`
+function oneHotAleatorio(size) {
+    const vetor = new Array(size).fill(0)
+    vetor[Math.floor(Math.random() * size)] = 1
+    return vetor
+}
+
+// Aumenta a base em 50 pessoas com dados totalmente aleatórios
+for (let i = 0; i < 50; i++) {
+    const idade = Math.random()
+    const cor = oneHotAleatorio(3)
+    const localizacao = oneHotAleatorio(3)
+    tensorPessoasNormalizado.push([idade, ...cor, ...localizacao])
+    tensorLabels.push(oneHotAleatorio(3))
+}
+
 // Criamos tensores de entrada (xs) e saída (ys) para treinar o modelo
 const inputXs = tf.tensor2d(tensorPessoasNormalizado)
 const outputYs = tf.tensor2d(tensorLabels)
@@ -79,11 +95,11 @@ const pessoaTensorNormalizado = [
     [
         0.2, // idade normalizada
         0,    // cor azul
-        0,    // cor vermelho
-        1,    // cor verde
-        0,    // localização São Paulo
+        1,    // cor vermelho
+        0,    // cor verde
+        1,    // localização São Paulo
         0,    // localização Rio
-        1     // localização Curitiba
+        0     // localização Curitiba
     ]
 ]
 
