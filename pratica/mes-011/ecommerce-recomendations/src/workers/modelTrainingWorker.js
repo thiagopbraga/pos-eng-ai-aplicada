@@ -13,28 +13,30 @@ const WEIGHTS = {
 
 const normalize = (value, min, max) => (value - min) / ((max-min) || 1)
 
-function makeContext(catalog, users){
+function makeContext(products, users) {
     const ages = users.map(u => u.age)
-    const prices = catalog.map(p => p.price)
+    const prices = products.map(p => p.price)
 
     const minAge = Math.min(...ages)
     const maxAge = Math.max(...ages)
 
-    const minPrice = Math.min(...prices) 
+    const minPrice = Math.min(...prices)
     const maxPrice = Math.max(...prices)
 
-    const colors = [...new Set(catalog.map(p=> p.color))]
-    const categories = [...new Set(catalog.map(p=> p.category))]
+    const colors = [...new Set(products.map(p => p.color))]
+    const categories = [...new Set(products.map(p => p.category))]
 
-    const colorsIndex = Object.fromEntries(colors.map((color, index) => {
-        return [color, index]
-    }))
+    const colorsIndex = Object.fromEntries(
+        colors.map((color, index) => {
+            return [color, index]
+        }))
+    const categoriesIndex = Object.fromEntries(
+        categories.map((category, index) => {
+            return [category, index]
+        }))
 
-    const categoriesIndex = Object.fromEntries(categories.map((category, index) => {
-        return [category, index]
-    }))
-
-    // Computar a média de idade dos compradores por produto
+    // Computar a média de idade dos comprados por produto
+    // (ajuda a personalizar)
     const midAge = (minAge + maxAge) / 2
     const ageSums = {}
     const ageCounts = {}
@@ -47,27 +49,27 @@ function makeContext(catalog, users){
     })
 
     const productAvgAgeNorm = Object.fromEntries(
-        catalog.map(product => {
+        products.map(product => {
             const avg = ageCounts[product.name] ?
                 ageSums[product.name] / ageCounts[product.name] :
                 midAge
-                
+
             return [product.name, normalize(avg, minAge, maxAge)]
         })
     )
 
-    return  {
-        catalog,
+    return {
+        products,
         users,
         colorsIndex,
         categoriesIndex,
+        productAvgAgeNorm,
         minAge,
         maxAge,
         minPrice,
         maxPrice,
         numCategories: categories.length,
         numColors: colors.length,
-        productAvgAgeNorm: (minAge + maxAge) / 2,
         // price + age + colors + categories
         dimentions: 2 + categories.length + colors.length
     }
@@ -101,8 +103,8 @@ function encodeProduct(product, context) {
 
     const color = oneHotWeighted(
         context.colorsIndex[product.color],
-        context.numCategories,
-        WEIGHTS.category
+        context.numcolors,
+        WEIGHTS.color
     )
 
     return tf.concat1d(
@@ -110,22 +112,49 @@ function encodeProduct(product, context) {
     )
 }
 
+function encodeUser(user, context) {
+    if(user.purchases.length) {
+        return tf.stack(
+            user.purchases.map(
+                product => encodeProduct(product, context)
+            )
+        )
+        .mean(0)
+        .reshape([
+            1,
+            context.dimentions
+        ])
+    }
+}
+
+function createTrainingData(context) {
+    context.users.forEach(user => {
+        const userVector = encodeUser(user, context).dataSync()
+
+        debugger
+    })
+}
+
 async function trainModel({ users }) {
     console.log('Training model with users:', users)
 
     postMessage({ type: workerEvents.progressUpdate, progress: { progress: 50 } });
-    const catalog = await (await fetch('/data/products.json')).json()
+    const products = await (await fetch('/data/products.json')).json()
 
-    const context = makeContext(catalog, users)
-    context.productVectores = catalog.map(product => {
+    console.log('before makeContext')
+    const context = makeContext(products, users)
+    context.productVectores = products.map(product => {
         return {
             name: product.name,
             meta: {...product},
             vector: encodeProduct(product, context).dataSync()
         }
     })
+    
 
-    debugger
+    console.log('before createTraining')
+    const trainData = createTrainingData(context)
+    console.log('after createTraining')
 
     postMessage({
         type: workerEvents.trainingLog,
